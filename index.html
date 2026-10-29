@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>EmotionTune AI — Emotion-Based Music Player</title>
+<meta name="description" content="EmotionTune AI reads your facial expression in the browser and finds music that matches your mood. Your face sets the mood. AI finds the music." />
+<meta name="theme-color" content="#07070d" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎭</text></svg>" />
+<style>
+:root{
+  --bg:#07070d;--bg2:#0c0c17;--panel:rgba(20,20,34,.62);--panel-brd:rgba(255,255,255,.08);
+  --txt:#eef0fa;--txt-dim:#9aa0bd;--txt-faint:#666d8c;
+  --v:#8b5cf6;--c:#22d3ee;--m:#f472b6;--ok:#34d399;--warn:#fbbf24;--bad:#fb7185;
+  --grad:linear-gradient(135deg,#8b5cf6,#22d3ee 55%,#f472b6);
+  --r:18px;--r-sm:11px;--sh:0 24px 60px -28px rgba(0,0,0,.9);
+  --blur:saturate(150%) blur(18px);--ease:cubic-bezier(.22,1,.36,1);
+}
+[data-theme="light"]{
+  --bg:#eef1f8;--bg2:#e3e8f4;--panel:rgba(255,255,255,.72);--panel-brd:rgba(12,16,40,.10);
+  --txt:#111528;--txt-dim:#4d5470;--txt-faint:#8b93ae;--sh:0 20px 50px -30px rgba(20,25,60,.45);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{
+  background:
+    radial-gradient(1100px 620px at 12% -12%,rgba(139,92,246,.22),transparent 62%),
+    radial-gradient(900px 560px at 92% 4%,rgba(34,211,238,.16),transparent 60%),
+    radial-gradient(900px 700px at 50% 118%,rgba(244,114,182,.14),transparent 62%),
+    var(--bg);
+  color:var(--txt);
+  font:15px/1.55 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;padding:18px clamp(12px,3vw,34px) 40px;
+  transition:background .5s var(--ease),color .35s;
+}
+h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:700}
+button,select,input{font:inherit;color:inherit}
+em{font-style:normal;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+.boot{position:fixed;inset:0;z-index:99;display:grid;place-content:center;gap:14px;justify-items:center;
+  background:var(--bg);text-align:center;padding:24px;transition:opacity .6s,visibility .6s}
+.boot.done{opacity:0;visibility:hidden;pointer-events:none}
+.boot__logo{font-size:2.4rem;letter-spacing:.16em;animation:float 3.4s ease-in-out infinite}
+.boot__title{font-size:2rem}
+.boot__tag{color:var(--txt-dim);margin:0}
+.boot__hint{color:var(--txt-faint);font-size:.8rem;margin:0}
+.boot__bar{width:220px;height:3px;border-radius:9px;background:rgba(255,255,255,.12);overflow:hidden}
+.boot__bar i{display:block;height:100%;width:38%;background:var(--grad);border-radius:9px;animation:load 1.15s ease-in-out infinite}
+@keyframes load{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
+@keyframes float{50%{transform:translateY(-9px)}}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:13px}
+.brand__mark{position:relative;width:52px;height:52px;flex:none;display:grid;place-items:center;
+  font-size:1.35rem;border-radius:15px;border:1px solid var(--panel-brd);background:var(--panel);
+  backdrop-filter:var(--blur);box-shadow:var(--sh)}
+.brand__mark span{position:absolute;bottom:-5px;right:-5px;font-size:.72rem;background:var(--bg2);
+  border:1px solid var(--panel-brd);border-radius:50%;padding:2px 3px}
+.brand__text h1{font-size:1.3rem;line-height:1.1}
+.brand__text p{margin:2px 0 0;font-size:.76rem;color:var(--txt-dim)}
+.topbar__actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pill{font-size:.7rem;padding:5px 10px;border-radius:99px;border:1px solid var(--panel-brd);
+  background:var(--panel);color:var(--txt-dim);white-space:nowrap}
+.pill--privacy{color:var(--ok)}
+.icon-btn{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;cursor:pointer;
+  border:1px solid var(--panel-brd);background:var(--panel);backdrop-filter:var(--blur);
+  transition:transform .18s var(--ease),background .2s,border-color .2s}
+.icon-btn:hover{transform:translateY(-2px);border-color:rgba(139,92,246,.6);background:rgba(139,92,246,.16)}
+.icon-btn:active{transform:scale(.95)}
+.icon-btn--sm{width:30px;height:30px;font-size:.85rem;border-radius:9px}
+.icon-btn--play{width:50px;height:50px;font-size:1.05rem;background:var(--grad);border:0;color:#06060c;font-weight:700}
+.icon-btn.is-on{background:var(--m);border-color:var(--m);color:#06060c}
+
+.layout{display:grid;gap:14px;grid-template-columns:minmax(0,1.12fr) minmax(0,1fr) minmax(0,1.12fr);align-items:start}
+@media (max-width:1080px){.layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.panel--camera{grid-column:1/-1}}
+@media (max-width:700px){.layout{grid-template-columns:minmax(0,1fr)}}
+.panel{position:relative;border:1px solid var(--panel-brd);border-radius:var(--r);background:var(--panel);
+  backdrop-filter:var(--blur);box-shadow:var(--sh);padding:15px;overflow:hidden;animation:rise .55s var(--ease) both}
+.panel::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:var(--r);
+  background:linear-gradient(160deg,rgba(255,255,255,.07),transparent 42%)}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}}
+.panel__head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.panel__head h2{font-size:.83rem;text-transform:uppercase;letter-spacing:.13em;color:var(--txt-dim);display:flex;align-items:center;gap:8px}
+.panel__meta{font-size:.7rem;color:var(--txt-faint);font-variant-numeric:tabular-nums}
+.panel__sub{text-transform:none;letter-spacing:0;font-size:.72rem;color:var(--txt-faint);font-weight:500}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--txt-faint);transition:background .3s,box-shadow .3s}
+.dot[data-state="live"]{background:var(--ok);box-shadow:0 0 0 0 rgba(52,211,153,.55);animation:pulse 1.7s infinite}
+.dot[data-state="warn"]{background:var(--warn)}
+.dot[data-state="error"]{background:var(--bad)}
+
+.stage{position:relative;aspect-ratio:4/3;border-radius:var(--r-sm);overflow:hidden;background:#04040a;border:1px solid var(--panel-brd)}
+.stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.stage video{transform:scaleX(-1)}
+.stage canvas{transform:scaleX(-1);pointer-events:none}
+.stage__placeholder{position:absolute;inset:0;z-index:3;display:grid;place-content:center;justify-items:center;
+  gap:9px;text-align:center;padding:22px;background:radial-gradient(circle at 50% 40%,rgba(139,92,246,.2),rgba(4,4,10,.94) 72%)}
+.stage__placeholder[hidden]{display:none}
+.stage__icon{font-size:2rem;animation:float 3.4s ease-in-out infinite}
+.stage__lead{margin:0;font-size:.86rem;font-weight:600;max-width:26ch}
+.stage__sub{margin:0;font-size:.72rem;color:var(--txt-faint);max-width:30ch}
+.stage__btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px}
+.stage__badge{position:absolute;left:9px;top:9px;z-index:4;font-size:.68rem;font-weight:600;padding:4px 9px;
+  border-radius:99px;background:rgba(6,6,12,.8);border:1px solid var(--panel-brd);backdrop-filter:blur(6px);
+  color:var(--txt-dim);max-width:calc(100% - 18px)}
+.stage__badge[data-state="live"]{color:var(--ok);border-color:rgba(52,211,153,.5)}
+.stage__badge[data-state="warn"]{color:var(--warn);border-color:rgba(251,191,36,.5)}
+.stage__badge[data-state="error"]{color:var(--bad);border-color:rgba(251,113,133,.5)}
+.stage__scan{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .4s}
+.stage__scan.is-on{opacity:1;background:linear-gradient(180deg,transparent,rgba(34,211,238,.16) 47%,rgba(34,211,238,.5) 50%,rgba(34,211,238,.16) 53%,transparent);
+  background-size:100% 220%;animation:scan 2.6s linear infinite}
+@keyframes scan{from{background-position:0 -100%}to{background-position:0 200%}}
+.camera__foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:11px;flex-wrap:wrap}
+.modelstate{display:flex;align-items:center;gap:7px;font-size:.72rem;color:var(--txt-faint)}
+.modelstate__dot{width:7px;height:7px;border-radius:50%;background:var(--txt-faint)}
+.modelstate[data-state="ok"] .modelstate__dot{background:var(--ok)}
+.modelstate[data-state="error"] .modelstate__dot{background:var(--bad)}
+.modelstate[data-state="ok"]{color:var(--ok)}
+.camera__btns{display:flex;gap:7px}
+.privacy{margin:11px 0 0;font-size:.7rem;line-height:1.5;color:var(--txt-faint);border-left:2px solid rgba(52,211,153,.5);padding-left:9px}
+.privacy strong{color:var(--ok)}
+
+.btn{cursor:pointer;border-radius:var(--r-sm);border:1px solid transparent;padding:10px 16px;font-size:.84rem;
+  font-weight:650;transition:transform .16s var(--ease),filter .2s,background .2s,border-color .2s}
+.btn:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.09)}
+.btn:active:not(:disabled){transform:scale(.97)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn--primary{background:var(--grad);color:#06060c;box-shadow:0 12px 28px -14px rgba(139,92,246,.95)}
+.btn--ghost{background:rgba(255,255,255,.05);border-color:var(--panel-brd);color:var(--txt-dim)}
+.btn--ghost:hover:not(:disabled){color:var(--txt);border-color:rgba(139,92,246,.55)}
+.btn--danger{background:rgba(251,113,133,.14);border-color:rgba(251,113,133,.42);color:#ffb3c1}
+.btn--sm{padding:6px 11px;font-size:.75rem}
+.btn--wide{width:100%}
+
+.emoji-wrap{position:relative;display:grid;place-items:center;padding:8px 0 4px;min-height:130px}
+.emoji-glow{position:absolute;width:150px;height:150px;border-radius:50%;filter:blur(34px);opacity:.5;background:var(--v);transition:background .5s}
+.emoji{position:relative;font-size:clamp(3.6rem,11vw,5.6rem);line-height:1;transition:transform .35s var(--ease)}
+.emoji.pop{animation:pop .6s var(--ease)}
+@keyframes pop{0%{transform:scale(.35) rotate(-16deg);opacity:.15;filter:blur(6px)}60%{transform:scale(1.16) rotate(5deg)}100%{transform:scale(1);opacity:1;filter:none}}
+.emotion-label{margin:2px 0 12px;text-align:center;font-size:1.16rem;font-weight:800;letter-spacing:.16em;transition:color .4s}
+.confidence__row{display:flex;justify-content:space-between;font-size:.73rem;color:var(--txt-dim);margin-bottom:5px}
+.confidence__row strong{color:var(--txt);font-variant-numeric:tabular-nums}
+.confidence__track{height:7px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
+.confidence__fill{height:100%;width:0;border-radius:99px;background:var(--grad);transition:width .35s var(--ease),background .4s}
+.emotion-msg{margin:13px 0 0;font-size:.81rem;color:var(--txt-dim);min-height:2.6em}
+.analyze-status{display:flex;align-items:center;gap:8px;margin-top:11px;padding:8px 11px;border-radius:10px;
+  background:rgba(255,255,255,.04);border:1px solid var(--panel-brd);font-size:.75rem;color:var(--txt-dim)}
+.analyze-status__dot{width:7px;height:7px;border-radius:50%;background:var(--txt-faint);flex:none}
+.analyze-status[data-state="scan"] .analyze-status__dot{background:var(--c);animation:pulse 1.4s infinite}
+.analyze-status[data-state="ok"] .analyze-status__dot{background:var(--ok)}
+.analyze-status[data-state="warn"] .analyze-status__dot{background:var(--warn)}
+.analyze-status[data-state="warn"]{color:#ffe0a3;border-color:rgba(251,191,36,.35)}
+.analyze-status[data-state="error"]{color:#ffb3c1;border-color:rgba(251,113,133,.35)}
+.analyze-status[data-state="error"] .analyze-status__dot{background:var(--bad)}
+@keyframes pulse{70%{box-shadow:0 0 0 7px rgba(34,211,238,0)}100%{box-shadow:0 0 0 0 rgba(34,211,238,0)}}
+.categories{margin-top:14px}
+.categories__label{margin:0 0 7px;font-size:.66rem;text-transform:uppercase;letter-spacing:.12em;color:var(--txt-faint)}
+.dist{margin-top:13px}
+.dist__list{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.dist__row{display:grid;grid-template-columns:74px 1fr 34px;align-items:center;gap:7px;font-size:.68rem;color:var(--txt-faint)}
+.dist__bar{height:4px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
+.dist__bar i{display:block;height:100%;background:var(--grad);border-radius:99px;transition:width .28s}
+.dist__row.is-top{color:var(--txt)}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips--tiny .chip{font-size:.66rem;padding:3px 8px}
+.chip{cursor:pointer;border-radius:99px;border:1px solid var(--panel-brd);background:rgba(255,255,255,.05);
+  padding:6px 12px;font-size:.77rem;color:var(--txt-dim);transition:all .18s var(--ease);white-space:nowrap}
+.chip:hover{border-color:rgba(139,92,246,.6);color:var(--txt);transform:translateY(-1px)}
+.chip[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:#06060c;font-weight:700}
+.chip--static{cursor:default}
+.pref{margin-bottom:11px}
+.pref__label{margin:0 0 6px;font-size:.66rem;text-transform:uppercase;letter-spacing:.12em;color:var(--txt-faint)}
+select{width:100%;padding:9px 11px;border-radius:var(--r-sm);border:1px solid var(--panel-brd);background:rgba(255,255,255,.05);cursor:pointer}
+select:focus-visible,.btn:focus-visible,.icon-btn:focus-visible,.chip:focus-visible{outline:2px solid var(--c);outline-offset:2px}
+
+.reco{display:flex;gap:12px;padding:11px;border-radius:var(--r-sm);border:1px solid var(--panel-brd);background:rgba(255,255,255,.04);margin-bottom:11px}
+.reco__art{width:62px;height:62px;flex:none;border-radius:10px;display:grid;place-items:center;font-size:1.4rem;
+  background:var(--grad);color:#06060c;box-shadow:inset 0 0 0 1px rgba(0,0,0,.16)}
+.reco__body{min-width:0}
+.reco__body h3{font-size:.94rem;line-height:1.25;overflow-wrap:anywhere}
+.reco__body p{margin:2px 0 6px;font-size:.76rem;color:var(--txt-dim)}
+.query-box{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;border:1px dashed var(--panel-brd);
+  background:rgba(34,211,238,.05);margin-bottom:11px}
+.query-box__label{font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-faint);flex:none}
+.query-box code{flex:1;min-width:0;font-size:.74rem;color:var(--c);overflow-wrap:anywhere}
+.reco__actions{display:grid;gap:8px}
+.reco__actions-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.embed{margin-top:11px}
+.embed iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:10px;background:#000}
+.embed__note{margin:5px 0 0;font-size:.66rem;color:var(--txt-faint)}
+.scoring{margin-top:12px}
+
+.dock{margin-top:14px}
+.dock__grid{display:grid;gap:14px;grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:1080px){.dock__grid{grid-template-columns:repeat(2,minmax(0,1fr))}.panel--timeline{grid-column:1/-1}}
+@media (max-width:700px){.dock__grid{grid-template-columns:minmax(0,1fr)}}
+.player{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.player__art{width:58px;height:58px;flex:none;border-radius:12px;display:grid;place-items:center;font-size:1.3rem;
+  background:linear-gradient(135deg,#2a2440,#151225);border:1px solid var(--panel-brd)}
+.player__meta{min-width:0}
+.player__meta h3{font-size:.9rem;overflow-wrap:anywhere}
+.player__meta p{margin:2px 0 5px;font-size:.75rem;color:var(--txt-dim)}
+.progress{display:flex;align-items:center;gap:9px;font-size:.68rem;color:var(--txt-faint);font-variant-numeric:tabular-nums}
+.progress__track{flex:1;height:5px;border-radius:99px;background:rgba(255,255,255,.1);cursor:pointer;overflow:hidden}
+.progress__fill{height:100%;width:0;background:var(--grad);border-radius:99px}
+.transport{display:flex;align-items:center;gap:7px;margin-top:12px;flex-wrap:wrap}
+.volume{display:flex;align-items:center;gap:6px;margin-left:auto;font-size:.8rem}
+.volume input{width:78px;accent-color:var(--v);cursor:pointer}
+.player__note{margin:10px 0 0;font-size:.68rem;color:var(--txt-faint);line-height:1.45}
+#playbackBadge[data-mode="search"]{color:var(--c)}
+#playbackBadge[data-mode="queue"]{color:var(--warn)}
+.timeline{list-style:none;margin:0;padding:0;max-height:190px;overflow:auto;display:grid;gap:6px}
+.timeline__row{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;padding:6px 9px;
+  border-radius:9px;background:rgba(255,255,255,.04);border-left:2px solid var(--v);font-size:.75rem}
+.timeline__row time{color:var(--txt-faint);font-variant-numeric:tabular-nums;font-size:.68rem}
+.timeline__row .tl-emoji{font-size:1rem}
+.timeline__row .tl-conf{font-size:.68rem;color:var(--txt-dim);font-variant-numeric:tabular-nums}
+.timeline__empty,.foryou__empty{margin:0;font-size:.76rem;color:var(--txt-faint)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}
+.stat{padding:8px;border-radius:9px;background:rgba(255,255,255,.04);text-align:center}
+.stat b{display:block;font-size:1rem;font-variant-numeric:tabular-nums}
+.stat span{font-size:.6rem;text-transform:uppercase;letter-spacing:.09em;color:var(--txt-faint)}
+.foryou{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.foryou__row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 10px;
+  border-radius:10px;background:rgba(255,255,255,.04);border:1px solid transparent;transition:border-color .2s,transform .2s}
+.foryou__row:hover{border-color:rgba(139,92,246,.45);transform:translateX(2px)}
+.foryou__idx{font-size:.68rem;color:var(--txt-faint);font-variant-numeric:tabular-nums}
+.foryou__info h4{margin:0;font-size:.82rem;font-weight:650;line-height:1.25}
+.foryou__info p{margin:2px 0 0;font-size:.7rem;color:var(--txt-dim)}
+.foryou__info .chips{margin-top:5px}
+.foryou__btns{display:grid;gap:4px}
+.foryou__btns button{width:29px;height:26px;font-size:.74rem;border-radius:7px;cursor:pointer;
+  border:1px solid var(--panel-brd);background:rgba(255,255,255,.05)}
+.foryou__btns button:hover{border-color:var(--v);background:rgba(139,92,246,.2)}
+
+.footer{margin-top:26px;text-align:center;color:var(--txt-faint);font-size:.72rem;display:grid;gap:5px}
+.footer__keys{font-size:.68rem}
+kbd{font-family:ui-monospace,monospace;font-size:.66rem;padding:1px 5px;border-radius:5px;border:1px solid var(--panel-brd);background:rgba(255,255,255,.06)}
+.toasts{position:fixed;right:16px;bottom:16px;z-index:80;display:grid;gap:8px;max-width:min(340px,88vw)}
+.toast{padding:11px 13px;border-radius:11px;font-size:.79rem;border:1px solid var(--panel-brd);
+  background:rgba(14,14,24,.94);backdrop-filter:blur(10px);box-shadow:var(--sh);animation:tin .35s var(--ease) both;border-left:3px solid var(--v)}
+.toast[data-type="error"]{border-left-color:var(--bad)}
+.toast[data-type="warn"]{border-left-color:var(--warn)}
+.toast[data-type="ok"]{border-left-color:var(--ok)}
+.toast.out{animation:tout .3s var(--ease) forwards}
+@keyframes tin{from{opacity:0;transform:translateX(24px)}}
+@keyframes tout{to{opacity:0;transform:translateX(24px)}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<div id="boot" class="boot" role="status" aria-live="polite">
+  <div class="boot__logo">🎭<span>🎵</span>🤖</div>
+  <h1 class="boot__title">EmotionTune <em>AI</em></h1>
+  <p class="boot__tag">Your face sets the mood. AI finds the music.</p>
+  <div class="boot__bar"><i></i></div>
+  <p class="boot__hint">Warming up the on-device expression model…</p>
+</div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand__mark" aria-hidden="true">🎭<span>🎵</span>🤖</div>
+    <div class="brand__text">
+      <h1>EmotionTune <em>AI</em></h1>
+      <p>Your face sets the mood. AI finds the music.</p>
+    </div>
+  </div>
+  <div class="topbar__actions">
+    <span class="pill pill--privacy" title="All frame processing happens on this device">🔒 On-device</span>
+    <span class="pill" id="sessionPill" title="Session clock">00:00</span>
+    <button class="icon-btn" id="themeToggle" aria-label="Toggle dark and light theme" title="Toggle theme (T)">🌙</button>
+    <button class="icon-btn" id="shortcutsBtn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">⌨</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="panel panel--camera" aria-labelledby="camHeading">
+    <div class="panel__head">
+      <h2 id="camHeading"><span class="dot" id="camDot" data-state="idle"></span> Live Expression Scan</h2>
+      <span class="panel__meta" id="fpsReadout">— fps</span>
+    </div>
+    <div class="stage">
+      <video id="cam" playsinline muted autoplay></video>
+      <canvas id="overlay"></canvas>
+      <div class="stage__placeholder" id="camPlaceholder">
+        <div class="stage__icon">📷</div>
+        <p class="stage__lead">Camera access is needed to read your expression.</p>
+        <p class="stage__sub">Frames are processed locally in this tab. Nothing is uploaded.</p>
+        <div class="stage__btns">
+          <button class="btn btn--primary" id="startCam">Start camera</button>
+          <button class="btn btn--ghost" id="demoMode">Demo without camera</button>
+        </div>
+      </div>
+      <div class="stage__badge" id="camStatus" data-state="idle">Camera idle</div>
+      <div class="stage__scan" id="scanLine" aria-hidden="true"></div>
+    </div>
+    <div class="camera__foot">
+      <div class="modelstate" id="modelState">
+        <span class="modelstate__dot"></span>
+        <span id="modelStateText">Expression model: not loaded</span>
+      </div>
+      <div class="camera__btns">
+        <button class="btn btn--sm btn--ghost" id="toggleMesh" aria-pressed="true">Mesh: on</button>
+        <button class="btn btn--sm btn--danger" id="stopCam" disabled>Stop camera</button>
+      </div>
+    </div>
+    <p class="privacy"><strong>Privacy.</strong> Camera processing is used only for real-time emotion analysis.
+      Frames are never stored or uploaded.</p>
+  </section>
+
+  <section class="panel panel--emotion" aria-labelledby="emoHeading">
+    <div class="panel__head">
+      <h2 id="emoHeading">Detected Emotion</h2>
+      <span class="panel__meta" id="dwell">stable</span>
+    </div>
+    <div class="emoji-wrap">
+      <div class="emoji-glow" id="emojiGlow"></div>
+      <div class="emoji" id="emojiBig" role="img" aria-label="Detected emotion">🫥</div>
+    </div>
+    <p class="emotion-label" id="emotionLabel">NO READING</p>
+    <div class="confidence">
+      <div class="confidence__row"><span>Confidence</span><strong id="confidenceValue">—</strong></div>
+      <div class="confidence__track"><div class="confidence__fill" id="confidenceFill"></div></div>
+    </div>
+    <p class="emotion-msg" id="emotionMessage" aria-live="polite">Start the camera and hold your face inside the frame.</p>
+    <div class="analyze-status" id="analyzeStatus" data-state="idle">
+      <span class="analyze-status__dot"></span><span id="analyzeStatusText">Scanning idle</span>
+    </div>
+    <div class="categories">
+      <p class="categories__label">Suggested categories</p>
+      <div class="chips chips--tiny" id="categoryChips"></div>
+    </div>
+    <div class="dist">
+      <p class="categories__label">Expression distribution</p>
+      <ul class="dist__list" id="distList"></ul>
+    </div>
+  </section>
+
+  <section class="panel panel--reco" aria-labelledby="recoHeading">
+    <div class="panel__head">
+      <h2 id="recoHeading">Music Match</h2>
+      <button class="icon-btn icon-btn--sm" id="refreshReco" title="New suggestion (R)" aria-label="New suggestion">⟳</button>
+    </div>
+    <div class="pref">
+      <p class="pref__label">Music language</p>
+      <div class="chips" id="langChips" role="group" aria-label="Music language"></div>
+    </div>
+    <div class="pref">
+      <p class="pref__label">Genre filter</p>
+      <select id="genreSelect" aria-label="Genre filter"></select>
+    </div>
+    <article class="reco" id="recoCard" aria-live="polite">
+      <div class="reco__art" id="recoArt"><span>♪</span></div>
+      <div class="reco__body">
+        <h3 id="recoTitle">Waiting for a reading…</h3>
+        <p id="recoArtist">Set a language, then let the AI read your face.</p>
+        <div class="chips chips--tiny" id="recoTags"></div>
+      </div>
+    </article>
+    <div class="query-box">
+      <span class="query-box__label">Generated query</span>
+      <code id="queryText">—</code>
+      <button class="icon-btn icon-btn--sm" id="copyQuery" title="Copy query" aria-label="Copy query">⧉</button>
+    </div>
+    <div class="reco__actions">
+      <button class="btn btn--primary btn--wide" id="playYt">▶ Play on YouTube</button>
+      <div class="reco__actions-row">
+        <button class="btn btn--ghost btn--sm" id="playYtm">YouTube Music</button>
+        <button class="btn btn--ghost btn--sm" id="braveBtn">Search on Brave</button>
+        <button class="btn btn--ghost btn--sm" id="loadEmbed">In-app player</button>
+      </div>
+    </div>
+    <div class="embed" id="embedWrap" hidden>
+      <iframe id="embedFrame" title="YouTube search player" allow="encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      <p class="embed__note">YouTube search embed. If it errors, use <em>Play on YouTube</em>.</p>
+    </div>
+    <div class="scoring">
+      <p class="categories__label">Why this track</p>
+      <ul class="scoring__list" id="scoringList"></ul>
+    </div>
+  </section>
+</main>
+
+<section class="dock">
+  <div class="dock__grid">
+    <div class="panel panel--player" aria-labelledby="playerHeading">
+      <div class="panel__head">
+        <h2 id="playerHeading">Player</h2>
+        <span class="panel__meta" id="playbackBadge" data-mode="idle">idle</span>
+      </div>
+      <div class="player">
+        <div class="player__art" id="art"><span>♪</span></div>
+        <div class="player__meta">
+          <h3 id="playerTitle">No track loaded</h3>
+          <p id="playerArtist">—</p>
+          <div class="chips chips--tiny" id="playerChips"></div>
+        </div>
+      </div>
+      <div class="progress">
+        <span id="elapsed">0:00</span>
+        <div class="progress__track" id="progressBar" role="slider" tabindex="0" aria-label="Seek"
+             aria-valuemin="0" aria-valuemax="210" aria-valuenow="0"><div class="progress__fill" id="progressFill"></div></div>
+        <span id="duration">3:30</span>
+      </div>
+      <div class="transport">
+        <button class="icon-btn" id="prevBtn" title="Previous (P)" aria-label="Previous">⏮</button>
+        <button class="icon-btn icon-btn--play" id="playPause" title="Play / pause (Space)" aria-label="Play">▶</button>
+        <button class="icon-btn" id="nextBtn" title="Next (N)" aria-label="Next">⏭</button>
+        <button class="icon-btn" id="likeBtn" title="Like (L)" aria-label="Like">🤍</button>
+        <button class="icon-btn" id="skipBtn" title="Skip (S)" aria-label="Skip">⏭️</button>
+        <div class="volume"><span aria-hidden="true">🔊</span>
+          <input type="range" id="vol" min="0" max="100" value="70" aria-label="Volume" /></div>
+      </div>
+      <p class="player__note" id="playerNote">No audio is streamed here. Transport controls drive the queue; playback happens on YouTube.</p>
+    </div>
+
+    <div class="panel panel--timeline" aria-labelledby="timelineHeading">
+      <div class="panel__head"><h2 id="timelineHeading">Mood Timeline</h2><span class="panel__meta">this session</span></div>
+      <ul class="timeline" id="timeline"><li class="timeline__empty">No readings yet.</li></ul>
+      <div class="stats" id="stats"></div>
+    </div>
+
+    <div class="panel panel--foryou" aria-labelledby="foryouHeading">
+      <div class="panel__head">
+        <h2 id="foryouHeading">For You <span class="panel__sub">based on your mood</span></h2>
+        <button class="icon-btn icon-btn--sm" id="refreshForYou" title="Refresh list" aria-label="Refresh list">⟳</button>
+      </div>
+      <ol class="foryou" id="forYou"><li class="foryou__empty">Recommendations appear once a mood is detected.</li></ol>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p><strong>EmotionTune AI</strong> describes your facial expression — it is not a psychological or medical assessment.</p>
+  <p class="footer__keys">Shortcuts: <kbd>C</kbd> camera · <kbd>Space</kbd> play/pause · <kbd>N</kbd>/<kbd>P</kbd> next/prev ·
+    <kbd>L</kbd> like · <kbd>S</kbd> skip · <kbd>R</kbd> refresh · <kbd>T</kbd> theme · <kbd>Esc</kbd> stop</p>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script type="module">
+/* ═══════════════════════════════════════════════════════════
+   CONFIG
+   ═══════════════════════════════════════════════════════════ */
+const MODEL = {
+  visionCdn: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14',
+  wasmPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm',
+  taskPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+  maxFaces: 2,
+};
+const TUNING = {
+  minRawScore: 0.16, commitConfidence: 0.34, dwellMs: 750, cooldownMs: 1600,
+  bufferSize: 14, confidenceEma: 0.22, lowConfidenceMs: 1800, noFaceMs: 1100,
+};
+const EMOTIONS = {
+  happy:    { label:'HAPPY',    emoji:'😊', color:'#fbbf24', glow:'rgba(251,191,36,.55)', message:'Your expression reads upbeat. Here is something to ride that energy.', tags:['energetic','dance','feel-good','fun'], energy:0.82 },
+  sad:      { label:'SAD',      emoji:'😢', color:'#60a5fa', glow:'rgba(96,165,250,.55)', message:'You look a little low. These picks stay soft and unhurried.', tags:['calm','emotional','relaxing'], energy:0.28 },
+  angry:    { label:'ANGRY',    emoji:'😠', color:'#fb7185', glow:'rgba(251,113,133,.55)', message:'Brows are down and tense. Let us burn that off, then settle it.', tags:['calm','powerful','stress-relieving'], energy:0.74 },
+  neutral:  { label:'NEUTRAL',  emoji:'😐', color:'#94a3b8', glow:'rgba(148,163,184,.45)', message:'Relaxed resting expression. Low-key background music fits best.', tags:['chill','lofi','balanced','calm'], energy:0.48 },
+  fear:     { label:'FEAR',     emoji:'😨', color:'#a78bfa', glow:'rgba(167,139,250,.55)', message:'Wide eyes and raised brows. Something grounding and calm.', tags:['calm','relaxing'], energy:0.34 },
+  surprise: { label:'SURPRISE', emoji:'😲', color:'#22d3ee', glow:'rgba(34,211,238,.55)', message:'Eyes open, jaw dropped. Bright, fun tracks to match.', tags:['energetic','fun','trending'], energy:0.76 },
+  disgust:  { label:'DISGUST',  emoji:'🤢', color:'#34d399', glow:'rgba(52,211,153,.5)',  message:'Nose wrinkled. A clean, positive reset works well here.', tags:['calm','positive','feel-good'], energy:0.42 },
+};
+const UNKNOWN = { label:'NO READING', emoji:'🫥', color:'#666d8c', glow:'rgba(102,109,140,.4)', message:'Start the camera and hold your face inside the frame.', tags:[], energy:0.5 };
+const TAG_TO_GENRE = { energetic:'Party', dance:'Party', fun:'Party', 'feel-good':'Pop', powerful:'Rock', 'stress-relieving':'Rock', calm:'Lo-fi', relaxing:'Classical', emotional:'Romantic', chill:'Lo-fi', lofi:'Lo-fi', balanced:'All', trending:'Trending', positive:'Pop' };
+const LANGUAGES = [
+  { id:'hindi', label:'Hindi', flag:'🇮🇳' }, { id:'english', label:'English', flag:'🇬🇧' },
+  { id:'punjabi', label:'Punjabi', flag:'🎽' }, { id:'haryanvi', label:'Haryanvi', flag:'🌾' },
+  { id:'mix', label:'Mix', flag:'🎵' },
+];
+const GENRES = ['All','Bollywood','Pop','Rock','Lo-fi','Classical','Hip-Hop','Romantic','Party','Folk','Devotional','Trending'];
+const STATUS = {
+  idle:'Scanning idle', requesting:'Requesting camera permission…', scanning:'Scanning face…',
+  face:'Face detected', multi:'Multiple faces detected — analysing the nearest one',
+  analysing:'Analyzing emotion…', detected:'Emotion detected',
+  low:'Emotion confidence is low. Please face the camera for a moment.',
+  noface:'No face detected. Please position your face inside the camera frame.',
+  stopped:'Camera stopped — processing halted', demo:'Demo mode — simulated readings',
+};
+const SIM_DURATION = 210;
+
+/* ═══════════════════════════════════════════════════════════
+   UTILS
+   ═══════════════════════════════════════════════════════════ */
+const $ = (s, r = document) => r.querySelector(s);
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const rand = (n = 1) => Math.random() * n;
+const fmtClock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const wallClock = (d = new Date()) => d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') n.className = v;
+    else if (k === 'text') n.textContent = v;
+    else if (k.startsWith('on') && typeof v === 'function') n.addEventListener(k.slice(2), v);
+    else if (v != null) n.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null) n.append(kid);
+  return n;
+}
+function toast(msg, type = 'info', ttl = 4200) {
+  const host = $('#toasts');
+  const node = el('div', { class:'toast', 'data-type':type, text:msg });
+  host.append(node);
+  setTimeout(() => { node.classList.add('out'); setTimeout(() => node.remove(), 320); }, ttl);
+}
+const store = {
+  get(k, f = null) { try { const r = sessionStorage.getItem('et.' + k); return r === null ? f : JSON.parse(r); } catch { return f; } },
+  set(k, v) { try { sessionStorage.setItem('et.' + k, JSON.stringify(v)); } catch {} },
+};
+
+/* ═══════════════════════════════════════════════════════════
+   CATALOG
+   ═══════════════════════════════════════════════════════════ */
+const t = (id, title, artist, language, genre, mood, energy, valence) => ({ id, title, artist, language, genre, mood, energy, valence });
+const CATALOG = [
+  t('h01','Kesariya','Arijit Singh','hindi','Romantic',['emotional','calm'],0.35,0.7),
+  t('h02','Tum Hi Ho','Arijit Singh','hindi','Romantic',['emotional','calm'],0.25,0.38),
+  t('h03','Channa Mereya','Arijit Singh','hindi','Romantic',['emotional','calm'],0.3,0.32),
+  t('h04','Bekhayali','Sachet Tandon','hindi','Bollywood',['emotional','calm'],0.32,0.34),
+  t('h05','Apna Bana Le','Arijit Singh','hindi','Romantic',['calm','emotional'],0.3,0.52),
+  t('h06','Sun Raha Hai','Shreya Ghoshal','hindi','Romantic',['emotional','calm'],0.28,0.3),
+  t('h07','Chhod Diya','Arijit Singh','hindi','Romantic',['emotional','calm'],0.25,0.35),
+  t('h08','Raabta','Arijit Singh','hindi','Romantic',['calm','emotional'],0.3,0.46),
+  t('h09','O Re Piya','Rahat Fateh Ali Khan','hindi','Classical',['emotional','calm'],0.3,0.4),
+  t('h10','Kun Faya Kun','A.R. Rahman','hindi','Devotional',['calm','relaxing'],0.2,0.56),
+  t('h11','Tere Bina','A.R. Rahman','hindi','Classical',['calm','relaxing'],0.25,0.5),
+  t('h12','Aao Huzoor Tumko','Lata Mangeshkar','hindi','Classical',['calm','relaxing'],0.2,0.5),
+  t('h13','Nadaaniyan','Anuv Jain','hindi','Lo-fi',['chill','calm'],0.3,0.55),
+  t('h14','Alag Aasmaan','Anuv Jain','hindi','Lo-fi',['chill','relaxing'],0.28,0.5),
+  t('h15','Gul','Anuv Jain','hindi','Lo-fi',['chill','calm'],0.3,0.52),
+  t('h16','Ilahi','Arijit Singh','hindi','Bollywood',['calm','feel-good'],0.3,0.56),
+  t('h17','Tera Yaar Hoon Main','Arijit Singh','hindi','Pop',['feel-good','emotional'],0.45,0.62),
+  t('h18','Kal Ho Naa Ho','Sonu Nigam','hindi','Bollywood',['feel-good','calm'],0.42,0.62),
+  t('h19','Phir Se Ud Chala','Mohit Chauhan','hindi','Folk',['feel-good','calm'],0.45,0.6),
+  t('h20','Kala Chashma','Badshah, Neha Kakkar','hindi','Party',['dance','energetic','fun'],0.9,0.86),
+  t('h21','London Thumakda','Labh Janjua','hindi','Party',['dance','fun'],0.88,0.8),
+  t('h22','Bole Chudiyan','Amit Kumar','hindi','Bollywood',['feel-good','dance'],0.7,0.8),
+  t('h23','Ghungroo','Arijit Singh, Shilpa Rao','hindi','Pop',['dance','fun'],0.78,0.8),
+  t('h24','Malang','Ved Sharma','hindi','Pop',['energetic','feel-good'],0.75,0.7),
+  t('h25','Jiya Re','Neeti Mohan','hindi','Bollywood',['energetic','feel-good'],0.7,0.72),
+  t('h26','Nachde Ne Saare','Various Artists','hindi','Party',['dance','fun'],0.88,0.82),
+  t('h27','Desi Girl','Shankar Mahadevan','hindi','Party',['dance','fun'],0.84,0.78),
+  t('h28','Deewangi Deewangi','Shaan','hindi','Party',['fun','energetic'],0.86,0.8),
+  t('h29','Munni Badnaam Hui','Mamta Sharma','hindi','Party',['dance','fun'],0.87,0.79),
+  t('h30','Sadda Haq','Mohit Chauhan','hindi','Rock',['powerful','stress-relieving'],0.9,0.5),
+  t('h31','Zinda','Siddharth Mahadevan','hindi','Rock',['powerful','energetic'],0.9,0.5),
+  t('h32','Bhaag DK Bose','A.R. Rahman','hindi','Rock',['energetic','stress-relieving'],0.9,0.7),
+  t('h33','Rang De Basanti','Daler Mehndi','hindi','Folk',['energetic','powerful'],0.85,0.7),
+  t('h34','Sultan','Sukhwinder Singh','hindi','Bollywood',['powerful','energetic'],0.85,0.55),
+  t('h35','Maa Tujhe Salaam','A.R. Rahman','hindi','Devotional',['powerful','feel-good'],0.6,0.75),
+  t('h36','Aarambh','Sukhwinder Singh','hindi','Devotional',['powerful','energetic'],0.85,0.6),
+  t('h37','Shanti Mantra Lo-fi','Rishab Rikhiram Sharma','hindi','Lo-fi',['calm','relaxing'],0.22,0.55),
+  t('h38','Tum Se Hi','Mohit Chauhan','hindi','Romantic',['calm','emotional'],0.33,0.6),
+  t('h39','Pehla Pyaar','Various Artists','hindi','Romantic',['calm','feel-good'],0.4,0.68),
+  t('h40','Dil Dhadakne Do','Shankar Ehsaan Loy','hindi','Party',['fun','energetic'],0.8,0.75),
+  t('e01','Blinding Lights','The Weeknd','english','Pop',['energetic','dance'],0.88,0.8),
+  t('e02','Levitating','Dua Lipa','english','Pop',['dance','fun'],0.85,0.86),
+  t('e03','Uptown Funk','Mark Ronson','english','Pop',['dance','fun'],0.9,0.9),
+  t('e04','Happy','Pharrell Williams','english','Pop',['feel-good','fun'],0.85,0.95),
+  t('e05',"Can't Stop the Feeling",'Justin Timberlake','english','Pop',['feel-good','dance'],0.87,0.9),
+  t('e06','Shape of You','Ed Sheeran','english','Pop',['dance','fun'],0.8,0.8),
+  t('e07','Hymn for the Weekend','Coldplay','english','Pop',['energetic','feel-good'],0.8,0.75),
+  t('e08','Wake Me Up','Avicii','english','Pop',['energetic','feel-good'],0.85,0.7),
+  t('e09','Titanium','David Guetta','english','Pop',['powerful','energetic'],0.88,0.6),
+  t('e10','Something Just Like This','The Chainsmokers','english','Pop',['feel-good','dance'],0.78,0.76),
+  t('e11','Mr. Brightside','The Killers','english','Rock',['energetic','feel-good'],0.88,0.7),
+  t('e12','Believer','Imagine Dragons','english','Rock',['powerful','energetic'],0.9,0.5),
+  t('e13','Thunder','Imagine Dragons','english','Rock',['powerful','stress-relieving'],0.88,0.55),
+  t('e14','Eye of the Tiger','Survivor','english','Rock',['powerful','energetic'],0.9,0.7),
+  t('e15','Numb','Linkin Park','english','Rock',['stress-relieving','powerful'],0.85,0.4),
+  t('e16','In the End','Linkin Park','english','Rock',['stress-relieving','emotional'],0.8,0.42),
+  t('e17','Lose Yourself','Eminem','english','Hip-Hop',['powerful','stress-relieving'],0.92,0.6),
+  t('e18','Stronger','Kanye West','english','Hip-Hop',['powerful','energetic'],0.9,0.7),
+  t('e19','Sunflower','Post Malone, Swae Lee','english','Hip-Hop',['chill','fun'],0.55,0.7),
+  t('e20','Someone Like You','Adele','english','Pop',['emotional','calm'],0.25,0.3),
+  t('e21','Fix You','Coldplay','english','Rock',['emotional','calm'],0.3,0.35),
+  t('e22','The Scientist','Coldplay','english','Rock',['emotional','calm'],0.25,0.32),
+  t('e23','Rise Up','Andra Day','english','Pop',['calm','emotional'],0.3,0.45),
+  t('e24','Lovely','Billie Eilish','english','Pop',['calm','emotional'],0.3,0.36),
+  t('e25','everything i wanted','Billie Eilish','english','Pop',['chill','emotional'],0.4,0.46),
+  t('e26','As It Was','Harry Styles','english','Pop',['chill','feel-good'],0.55,0.6),
+  t('e27','Heat Waves','Glass Animals','english','Pop',['chill','fun'],0.6,0.66),
+  t('e28','Peaches','Justin Bieber','english','Pop',['chill','fun'],0.55,0.7),
+  t('e29','Snowman','WYS','english','Lo-fi',['chill','calm'],0.3,0.5),
+  t('e30','Weightless','Marconi Union','english','Lo-fi',['calm','relaxing'],0.1,0.5),
+  t('e31','Clair de Lune','Claude Debussy','english','Classical',['calm','relaxing'],0.1,0.5),
+  t('e32','Experience','Ludovico Einaudi','english','Classical',['calm','emotional'],0.2,0.5),
+  t('e33','Time','Hans Zimmer','english','Classical',['calm','powerful'],0.35,0.45),
+  t('e34','Perfect','Ed Sheeran','english','Romantic',['calm','emotional'],0.3,0.76),
+  t('e35','Photograph','Ed Sheeran','english','Romantic',['calm','emotional'],0.3,0.6),
+  t('e36','Golden Hour','JVKE','english','Romantic',['feel-good','emotional'],0.45,0.8),
+  t('e37','Stay','The Kid LAROI','english','Pop',['energetic','fun'],0.82,0.6),
+  t('e38','Summertime Sadness','Lana Del Rey','english','Pop',['emotional','calm'],0.4,0.4),
+  t('e39','Oceans','Hillsong United','english','Devotional',['calm','relaxing'],0.2,0.52),
+  t('e40','Runaway','AURORA','english','Folk',['calm','emotional'],0.3,0.5),
+  t('p01','Lover','Diljit Dosanjh','punjabi','Romantic',['calm','emotional'],0.4,0.7),
+  t('p02','G.O.A.T.','Diljit Dosanjh','punjabi','Hip-Hop',['powerful','energetic'],0.85,0.7),
+  t('p03','Born to Shine','Diljit Dosanjh','punjabi','Hip-Hop',['energetic','powerful'],0.88,0.72),
+  t('p04','Clash','Diljit Dosanjh','punjabi','Hip-Hop',['energetic','fun'],0.85,0.68),
+  t('p05','Patiala Peg','Diljit Dosanjh','punjabi','Party',['dance','fun'],0.85,0.82),
+  t('p06','Do You Know','Diljit Dosanjh','punjabi','Pop',['fun','dance'],0.8,0.8),
+  t('p07','5 Taara','Diljit Dosanjh','punjabi','Party',['dance','fun'],0.84,0.8),
+  t('p08','295','Sidhu Moose Wala','punjabi','Hip-Hop',['powerful','emotional'],0.8,0.5),
+  t('p09','So High','Sidhu Moose Wala','punjabi','Hip-Hop',['chill','powerful'],0.6,0.55),
+  t('p10','The Last Ride','Sidhu Moose Wala','punjabi','Hip-Hop',['emotional','calm'],0.45,0.4),
+  t('p11','Bambiha Bole','Sidhu Moose Wala','punjabi','Hip-Hop',['powerful','energetic'],0.88,0.6),
+  t('p12','Excuses','AP Dhillon','punjabi','Pop',['chill','feel-good'],0.55,0.65),
+  t('p13','Insane','AP Dhillon','punjabi','Pop',['chill','dance'],0.6,0.6),
+  t('p14','Majhail','AP Dhillon','punjabi','Pop',['energetic','fun'],0.8,0.65),
+  t('p15','With You','AP Dhillon','punjabi','Pop',['chill','calm'],0.5,0.6),
+  t('p16','Kush','Karan Aujla','punjabi','Hip-Hop',['fun','energetic'],0.82,0.7),
+  t('p17','Mexico','Karan Aujla','punjabi','Hip-Hop',['chill','fun'],0.6,0.65),
+  t('p18','Adhiya','Karan Aujla','punjabi','Romantic',['emotional','calm'],0.4,0.5),
+  t('p19','Chithiyaan','Karan Aujla','punjabi','Romantic',['emotional','calm'],0.35,0.42),
+  t('p20','Lahore','Guru Randhawa','punjabi','Pop',['feel-good','dance'],0.78,0.75),
+  t('p21','High Rated Gabru','Guru Randhawa','punjabi','Party',['dance','fun'],0.85,0.8),
+  t('p22','Tere Te','Guru Randhawa','punjabi','Pop',['feel-good','dance'],0.75,0.75),
+  t('p23','Laung Laachi','Mannat Noor','punjabi','Romantic',['calm','emotional'],0.4,0.6),
+  t('p24','Qismat','Ammy Virk','punjabi','Romantic',['emotional','calm'],0.35,0.45),
+  t('p25','Sufna','Ammy Virk','punjabi','Folk',['calm','emotional'],0.3,0.5),
+  t('p26','Titliaan','Afsana Khan','punjabi','Pop',['emotional','calm'],0.4,0.45),
+  t('p27','Baari','Bilal Saeed','punjabi','Romantic',['calm','emotional'],0.35,0.55),
+  t('p28','Kya Baat Ay','Harrdy Sandhu','punjabi','Pop',['dance','fun'],0.8,0.75),
+  t('p29','Naah','Harrdy Sandhu','punjabi','Pop',['energetic','fun'],0.82,0.7),
+  t('p30','Bijlee Bijlee','Harrdy Sandhu','punjabi','Party',['dance','fun'],0.85,0.78),
+  t('p31','Sakhiyaan','Mannat Noor','punjabi','Folk',['fun','dance'],0.78,0.72),
+  t('p32','Punjabi Mutiyaran','Sunanda Sharma','punjabi','Folk',['dance','fun'],0.8,0.75),
+  t('p33','Guitar Sikhda','Jassie Gill','punjabi','Pop',['feel-good','emotional'],0.65,0.75),
+  t('p34','Nakhre','Jassie Gill','punjabi','Pop',['fun','dance'],0.78,0.75),
+  t('p35','Waalian','Harnoor','punjabi','Romantic',['calm','emotional'],0.3,0.45),
+  t('p36','Cheques','Shubh','punjabi','Hip-Hop',['chill','powerful'],0.62,0.6),
+  t('p37','Nanak Naam Chardi Kala','Various Artists','punjabi','Devotional',['calm','relaxing'],0.25,0.65),
+  t('p38','Mitti Da Bawa','Gurdas Maan','punjabi','Folk',['calm','emotional'],0.35,0.55),
+  t('p39','Jatt Te Jawani','Dilpreet Dhillon','punjabi','Folk',['energetic','powerful'],0.84,0.68),
+  t('p40','Thokda Reha','Amrinder Gill','punjabi','Folk',['calm','feel-good'],0.45,0.6),
+  t('y01','52 Gaj Ka Daman','Renuka Panwar','haryanvi','Folk',['dance','fun'],0.85,0.8),
+  t('y02','Solid Body','Sapna Choudhary','haryanvi','Party',['dance','energetic'],0.88,0.78),
+  t('y03','Thumak Thumak','Sapna Choudhary','haryanvi','Party',['dance','fun'],0.86,0.78),
+  t('y04','Teri Aankhya Ka Jadu','Masoom Sharma','haryanvi','Romantic',['calm','emotional'],0.5,0.65),
+  t('y05','Chhori Haryana Ki','Raj Mawar','haryanvi','Folk',['fun','dance'],0.8,0.75),
+  t('y06','Jaatni','Khasa Aala Chahar','haryanvi','Hip-Hop',['powerful','energetic'],0.85,0.65),
+  t('y07','Gaadi Teri Lalkara','Amit Saini Rohtakiya','haryanvi','Folk',['energetic','fun'],0.82,0.7),
+  t('y08','Bhole Ka Shringar','Various Artists','haryanvi','Devotional',['calm','positive'],0.45,0.72),
+  t('y09','Haryana Roadways','Various Artists','haryanvi','Folk',['fun','energetic'],0.78,0.72),
+  t('y10','Yaar Badmash','Masoom Sharma','haryanvi','Hip-Hop',['powerful','stress-relieving'],0.84,0.6),
+  t('y11','Mhari Gali','Raj Mawar','haryanvi','Folk',['fun','dance'],0.79,0.74),
+  t('y12','Chhora Haryana Ka','Gulzaar Chhaniwala','haryanvi','Hip-Hop',['energetic','powerful'],0.86,0.66),
+  t('y13','Rola','Raj Mawar','haryanvi','Folk',['powerful','energetic'],0.83,0.66),
+  t('y14','Dil Ka Raja','Various Artists','haryanvi','Romantic',['calm','emotional'],0.42,0.6),
+  t('y15','Banni','Renuka Panwar','haryanvi','Folk',['fun','dance'],0.8,0.76),
+  t('y16','Gulaabi Sharara','Renuka Panwar','haryanvi','Party',['dance','fun'],0.84,0.78),
+  t('y17','Sapna Choudhary Hits','Sapna Choudhary','haryanvi','Party',['energetic','dance'],0.87,0.76),
+  t('y18','Dilbar Haryanvi','Various Artists','haryanvi','Pop',['feel-good','dance'],0.72,0.7),
+  t('y19','Maa Ke Haath Ka Khana','Various Artists','haryanvi','Folk',['calm','positive'],0.45,0.68),
+  t('y20','Chhora Jaat Ka','Amit Saini Rohtakiya','haryanvi','Folk',['powerful','energetic'],0.85,0.67),
+  t('m01','Nadiyon Paar','Rashmeet Kaur, Sachin-Jigar','mix','Party',['dance','fun'],0.86,0.8),
+  t('m02','Jhoome Jo Pathaan','Arijit Singh, Sukriti Kakar','mix','Party',['energetic','dance'],0.85,0.78),
+  t('m03','Apna Bana Le (Lo-fi Flip)','Arijit Singh','mix','Lo-fi',['chill','calm'],0.3,0.55),
+  t('m04','Kesariya (Chill Mix)','Arijit Singh','mix','Lo-fi',['chill','emotional'],0.32,0.6),
+  t('m05','Tum Kya Mile','Arijit Singh, Shreya Ghoshal','mix','Romantic',['calm','emotional'],0.35,0.62),
+  t('m06','Chaleya','Arijit Singh, Shilpa Rao','mix','Romantic',['feel-good','emotional'],0.55,0.75),
+  t('m07','Zinda Banda','Anirudh Ravichander','mix','Rock',['powerful','energetic'],0.9,0.62),
+  t('m08','Aararaari Raaro','Anirudh Ravichander','mix','Pop',['feel-good','dance'],0.78,0.76),
+];
+const LABEL = Object.fromEntries(LANGUAGES.map((l) => [l.id, l.label]));
+function buildQuery({ emotion, language, genre, confidence = 0.7 }) {
+  const moodWord = { happy:'happy energetic', sad:'sad relaxing', angry:'calm powerful', neutral:'chill lofi', surprise:'fun energetic trending', fear:'calm relaxing', disgust:'calm positive' }[emotion] || 'chill';
+  const lang = language === 'mix' ? '' : `${LABEL[language] || ''} `;
+  const g = genre && genre !== 'All' ? `${genre} ` : '';
+  const intent = confidence < 0.4 ? 'playlist' : 'songs';
+  return `${lang}${g}${moodWord} ${intent}`.replace(/\s+/g, ' ').trim();
+}
+const youtubeUrl = (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+const ytMusicUrl = (q) => `https://music.youtube.com/search?q=${encodeURIComponent(q)}`;
+const braveUrl = (q) => `https://search.brave.com/search?q=${encodeURIComponent(q + ' music')}`;
+
+/* ═══════════════════════════════════════════════════════════
+   RECOMMENDATION ENGINE
+   ═══════════════════════════════════════════════════════════ */
+class RecommendationEngine {
+  #likes = { genre:{}, artist:{}, language:{}, mood:{} };
+  #skips = { genre:{}, artist:{}, language:{}, mood:{} };
+  #served = [];
+  #lang = 'hindi'; #genre = 'All';
+  setLanguage(v) { this.#lang = v; }
+  setGenre(v) { this.#genre = v; }
+  get language() { return this.#lang; }
+  get genre() { return this.#genre; }
+  #bump(bag, k) { bag[k] = (bag[k] || 0) + 1; }
+  like(tr) { this.#bump(this.#likes.genre, tr.genre); this.#bump(this.#likes.artist, tr.artist); this.#bump(this.#likes.language, tr.language); tr.mood.forEach((m) => this.#bump(this.#likes.mood, m)); }
+  skip(tr) { this.#bump(this.#skips.genre, tr.genre); this.#bump(this.#skips.artist, tr.artist); this.#bump(this.#skips.language, tr.language); tr.mood.forEach((m) => this.#bump(this.#skips.mood, m)); }
+  #ctx(emotion, confidence) {
+    const meta = EMOTIONS[emotion];
+    const tags = meta?.tags || ['chill'];
+    const target = clamp((meta?.energy ?? 0.5) * (0.55 + confidence * 0.45) + 0.5 * (1 - confidence) * 0.9, 0.1, 0.95);
+    return { tags, target, confidence };
+  }
+  #score(tr, ctx) {
+    let s = tr.mood.filter((m) => ctx.tags.includes(m)).length * 34 * (0.5 + ctx.confidence);
+    if (this.#lang === 'mix') { s += 16; if (tr.language === 'mix') s += 10; }
+    else if (tr.language === this.#lang) s += 36;
+    else if (tr.language === 'mix') s += 9;
+    else s -= 12;
+    if (this.#genre === 'All') s += 5;
+    else if (tr.genre === this.#genre) s += 28;
+    else s -= 7;
+    s -= Math.abs(tr.energy - ctx.target) * 22;
+    s += (this.#likes.genre[tr.genre] || 0) * 6.5 - (this.#skips.genre[tr.genre] || 0) * 5.5;
+    s += (this.#likes.artist[tr.artist] || 0) * 9 - (this.#skips.artist[tr.artist] || 0) * 7.5;
+    s += (this.#likes.language[tr.language] || 0) * 4 - (this.#skips.language[tr.language] || 0) * 4.5;
+    for (const m of tr.mood) s += (this.#likes.mood[m] || 0) * 3.2 - (this.#skips.mood[m] || 0) * 2.8;
+    if (this.#served.includes(tr.id)) s -= 16;
+    return s + rand(7);
+  }
+  #ranked(emotion, confidence, exclude = []) {
+    const ctx = this.#ctx(emotion, confidence);
+    return CATALOG.filter((tr) => !exclude.includes(tr.id))
+      .map((tr) => ({ track: tr, score: this.#score(tr, ctx) }))
+      .sort((a, b) => b.score - a.score);
+  }
+  next(emotion, confidence) {
+    const ranked = this.#ranked(emotion, confidence);
+    if (!ranked.length) return null;
+    const { track } = ranked[0];
+    this.#served.push(track.id);
+    if (this.#served.length > 24) this.#served.shift();
+    const meta = EMOTIONS[emotion];
+    const reasons = [
+      `${meta ? meta.label.toLowerCase() : 'mood'} match: ${track.mood.join(', ')}`,
+      track.language === this.#lang ? `language: ${track.language}` : `language: ${track.language} (adjacent)`,
+    ];
+    if (this.#genre !== 'All') reasons.push(`genre filter: ${this.#genre}`);
+    reasons.push(`confidence ${Math.round(confidence * 100)}% weighted`);
+    const lg = this.#likes.genre[track.genre] || 0, sg = this.#skips.genre[track.genre] || 0;
+    if (lg) reasons.push(`${lg} like(s) in ${track.genre}`);
+    if (sg) reasons.push(`${sg} skip(s) in ${track.genre} counted`);
+    return { track, reasons };
+  }
+  forYou(emotion, confidence, count = 4, excludeId = null) {
+    const ranked = this.#ranked(emotion, confidence, excludeId ? [excludeId] : []);
+    const picked = []; const used = new Set();
+    for (const { track } of ranked) {
+      if (picked.length >= count) break;
+      if (used.has(track.artist) && picked.length < count - 1) continue;
+      picked.push(track); used.add(track.artist);
+    }
+    return picked;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EMOTION ENGINE
+   ═══════════════════════════════════════════════════════════ */
+class EmotionEngine {
+  #buffer = []; #pending = null; #pendingSince = 0; #lastCommit = 0; #ema = 0;
+  #lowSince = 0; #noFaceSince = 0; #current = null; #demoTimer = 0;
+  constructor({ onEmotion, onTrace, onHint }) { this.onEmotion = onEmotion; this.onTrace = onTrace; this.onHint = onHint; }
+  get current() { return this.#current; }
+  reset() { this.#buffer = []; this.#pending = null; this.#ema = 0; this.#current = null; this.#lowSince = 0; this.#noFaceSince = 0; }
+
+  static classify(categories) {
+    const b = Object.create(null);
+    for (const { categoryName, score } of categories) b[categoryName] = score;
+    const avg = (...n) => n.reduce((s, k) => s + (b[k] || 0), 0) / n.length;
+    const smile = avg('mouthSmileLeft','mouthSmileRight'), squint = avg('cheekSquintLeft','cheekSquintRight');
+    const frown = avg('mouthFrownLeft','mouthFrownRight'), browDown = avg('browDownLeft','browDownRight');
+    const browUpIn = b.browInnerUp || 0, browUpOut = avg('browOuterUpLeft','browOuterUpRight');
+    const eyeWide = avg('eyeWideLeft','eyeWideRight'), jawOpen = b.jawOpen || 0;
+    const sneer = avg('noseSneerLeft','noseSneerRight'), upperUp = avg('mouthUpperUpLeft','mouthUpperUpRight');
+    const press = avg('mouthPressLeft','mouthPressRight'), stretch = avg('mouthStretchLeft','mouthStretchRight');
+    const raw = {
+      happy: smile * 0.78 + squint * 0.22,
+      sad: frown * 0.6 + browUpIn * 0.4,
+      angry: browDown * 0.62 + press * 0.28 + sneer * 0.1,
+      surprise: jawOpen * 0.46 + eyeWide * 0.32 + (browUpIn * 0.14 + browUpOut * 0.08),
+      fear: browUpIn * 0.36 + eyeWide * 0.34 + stretch * 0.3,
+      disgust: sneer * 0.5 + upperUp * 0.3 + browDown * 0.2,
+    };
+    raw.neutral = clamp(0.46 - Math.max(...Object.values(raw), 0.0001) * 0.85, 0, 0.46);
+    const total = Object.values(raw).reduce((a, v) => a + v, 0) || 1;
+    const out = {};
+    for (const k of Object.keys(raw)) out[k] = raw[k] / total;
+    return out;
+  }
+
+  push(categories) {
+    this.#noFaceSince = 0;
+    const scores = EmotionEngine.classify(categories);
+    this.#buffer.push(scores);
+    if (this.#buffer.length > TUNING.bufferSize) this.#buffer.shift();
+    const keys = Object.keys(scores);
+    const avg = {};
+    for (const k of keys) avg[k] = 0;
+    for (const f of this.#buffer) for (const k of keys) avg[k] += f[k];
+    for (const k of keys) avg[k] /= this.#buffer.length;
+    this.onTrace(avg);
+
+    const ranked = keys.sort((a, b) => avg[b] - avg[a]);
+    const top = ranked[0], second = ranked[1], rawTop = avg[top];
+    const conf = clamp((avg[top] - avg[second]) / (avg[top] + 0.02) * 0.82 + avg[top] * 0.55, 0, 0.99);
+    this.#ema = this.#ema === 0 ? conf : this.#ema + (conf - this.#ema) * TUNING.confidenceEma;
+    const now = performance.now();
+
+    if (rawTop < TUNING.minRawScore) {
+      if (!this.#lowSince) this.#lowSince = now;
+      else if (now - this.#lowSince > TUNING.lowConfidenceMs) this.onHint('low');
+      return;
+    }
+    this.#lowSince = 0;
+    if (this.#ema < TUNING.commitConfidence) return;
+
+    if (top !== this.#pending) { this.#pending = top; this.#pendingSince = now; }
+    if (now - this.#pendingSince < TUNING.dwellMs || now - this.#lastCommit < TUNING.cooldownMs) return;
+
+    if (this.#current && this.#current.emotion === top) {
+      this.#current = { emotion: top, confidence: this.#ema };
+      this.onEmotion(this.#current, false);
+      return;
+    }
+    this.#lastCommit = now;
+    this.#current = { emotion: top, confidence: this.#ema };
+    this.onEmotion(this.#current, true);
+  }
+
+  pushNoFace() {
+    const now = performance.now();
+    if (!this.#noFaceSince) this.#noFaceSince = now;
+    if (now - this.#noFaceSince > TUNING.noFaceMs) { this.#buffer = []; this.#ema = 0; this.onHint('noface'); }
+  }
+
+  startDemo() {
+    const ids = Object.keys(EMOTIONS);
+    let i = 0;
+    const tick = () => {
+      const emotion = ids[i % ids.length]; i++;
+      const trace = {}; for (const k of ids) trace[k] = 0.04;
+      trace[emotion] = 0.72;
+      this.onTrace(trace);
+      this.#current = { emotion, confidence: 0.62 + rand(0.33) };
+      this.onEmotion(this.#current, true);
+    };
+    tick();
+    this.#demoTimer = setInterval(tick, 9000);
+  }
+  stopDemo() { clearInterval(this.#demoTimer); this.#demoTimer = 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CAMERA
+   ═══════════════════════════════════════════════════════════ */
+class CameraController {
+  #video; #canvas; #ctx; #landmarker; #stream; #raf = 0; #lastTs = 0; #frames = 0; #fpsStamp = 0;
+  #meshOn = true; #live = false; #loading = false;
+  constructor({ video, canvas, onResult, onStatus, onFps }) {
+    this.#video = video; this.#canvas = canvas; this.#ctx = canvas.getContext('2d');
+    this.onResult = onResult; this.onStatus = onStatus; this.onFps = onFps;
+  }
+  get isLive() { return this.#live; }
+  setMesh(on) { this.#meshOn = on; if (!on) this.#ctx.clearRect(0, 0, this.#canvas.width, this.#canvas.height); }
+
+  async start() {
+    if (this.#live) return true;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.onStatus('error', 'This browser has no camera API. Try Chrome, Edge, Firefox or Safari.');
+      return false;
+    }
+    if (!window.isSecureContext && location.hostname !== 'localhost') {
+      toast('Serve over HTTPS or localhost, otherwise the camera is blocked.', 'warn', 6500);
+    }
+    this.onStatus('requesting', STATUS.requesting);
+    try {
+      this.#stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false,
+      });
+    } catch (err) {
+      const n = err?.name || '';
+      this.onStatus('error',
+        n === 'NotAllowedError' || n === 'SecurityError' ? 'Camera permission denied. Allow it in the address bar, then retry.'
+        : n === 'NotFoundError' || n === 'OverconstrainedError' ? 'No camera found on this device.'
+        : n === 'NotReadableError' ? 'The camera is busy in another app. Close it and retry.'
+        : `Camera error: ${n || 'unknown'}`);
+      return false;
+    }
+    this.#video.srcObject = this.#stream;
+    try { await this.#video.play(); } catch {}
+    if (!(await this.#ensureModel())) return false;
+    this.#live = true; this.#frames = 0; this.#fpsStamp = performance.now();
+    this.onStatus('scan', STATUS.scanning);
+    this.#loop();
+    return true;
+  }
+
+  async #ensureModel() {
+    if (this.#landmarker) return true;
+    if (this.#loading) return false;
+    this.#loading = true;
+    try {
+      const vision = await import(MODEL.visionCdn);
+      const fileset = await vision.FilesetResolver.forVisionTasks(MODEL.wasmPath);
+      const make = (delegate) => vision.FaceLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: MODEL.taskPath, delegate },
+        runningMode: 'VIDEO', numFaces: MODEL.maxFaces, outputFaceBlendshapes: true,
+        minFaceDetectionConfidence: 0.5, minFacePresenceConfidence: 0.5, minTrackingConfidence: 0.5,
+      });
+      try { this.#landmarker = await make('GPU'); }
+      catch { this.#landmarker = await make('CPU'); }
+      return true;
+    } catch (err) {
+      console.error(err);
+      this.onStatus('error', 'Expression model failed to load. Check the connection or use demo mode.');
+      toast('Model download failed. Use "Demo without camera" to keep going.', 'error', 7000);
+      return false;
+    } finally { this.#loading = false; }
+  }
+
+  #loop = () => {
+    if (!this.#live) return;
+    this.#raf = requestAnimationFrame(this.#loop);
+    const v = this.#video;
+    if (v.readyState < 2 || !this.#landmarker) return;
+    const ts = performance.now();
+    if (ts - this.#lastTs < 32) return;
+    this.#lastTs = ts;
+    if (this.#canvas.width !== v.videoWidth) {
+      this.#canvas.width = v.videoWidth || 640;
+      this.#canvas.height = v.videoHeight || 480;
+    }
+    let result = null;
+    try { result = this.#landmarker.detectForVideo(v, ts); } catch { return; }
+    this.#frames++;
+    if (ts - this.#fpsStamp > 900) {
+      this.onFps(Math.round((this.#frames * 1000) / (ts - this.#fpsStamp)));
+      this.#frames = 0; this.#fpsStamp = ts;
+    }
+    this.#draw(result);
+    this.onResult(result);
+  };
+
+  #draw(result) {
+    const { width: w, height: h } = this.#canvas;
+    this.#ctx.clearRect(0, 0, w, h);
+    if (!this.#meshOn) return;
+    this.#ctx.fillStyle = 'rgba(34,211,238,.85)';
+    for (const face of result?.faceLandmarks || []) {
+      for (const p of face) {
+        this.#ctx.beginPath();
+        this.#ctx.arc(p.x * w, p.y * h, 1.15, 0, Math.PI * 2);
+        this.#ctx.fill();
+      }
+    }
+  }
+
+  stop() {
+    this.#live = false;
+    cancelAnimationFrame(this.#raf);
+    this.#stream?.getTracks().forEach((tr) => tr.stop());
+    this.#stream = null;
+    this.#video.srcObject = null;
+    this.#ctx?.clearRect(0, 0, this.#canvas.width, this.#canvas.height);
+    this.onFps(0);
+    this.onStatus('idle', STATUS.stopped);
+  }
+  dispose() { this.stop(); this.#landmarker?.close?.(); this.#landmarker = null; }
+}
+
+function largestFace(faces) {
+  if (!faces?.length) return null;
+  let best = faces[0], bestArea = -1;
+  for (const f of faces) {
+    let minX = 1, minY = 1, maxX = 0, maxY = 0;
+    for (const p of f) {
+      if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
+    }
+    const area = (maxX - minX) * (maxY - minY);
+    if (area > bestArea) { bestArea = area; best = f; }
+  }
+  return best;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UI
+   ═══════════════════════════════════════════════════════════ */
+class UI {
+  #mesh = true; #emotion = null;
+  constructor({ onLanguage, onGenre }) {
+    this.onLanguage = onLanguage; this.onGenre = onGenre;
+    this.#langChips(); this.#genres(); this.#distribution();
+  }
+  hideBoot() { const b = $('#boot'); b.classList.add('done'); setTimeout(() => b.setAttribute('hidden', ''), 620); }
+
+  #langChips() {
+    const host = $('#langChips');
+    for (const l of LANGUAGES) {
+      const chip = el('button', { class:'chip', type:'button', 'aria-pressed': String(l.id === 'hindi'), 'data-id': l.id, text: `${l.flag} ${l.label}` });
+      chip.addEventListener('click', () => {
+        [...host.children].forEach((c) => c.setAttribute('aria-pressed', 'false'));
+        chip.setAttribute('aria-pressed', 'true');
+        this.onLanguage(l.id);
+      });
+      host.append(chip);
+    }
+  }
+  setLanguage(id) { [...$('#langChips').children].forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.id === id))); }
+
+  #genres() {
+    const sel = $('#genreSelect');
+    sel.replaceChildren(...GENRES.map((g) => el('option', { value:g, text:g })));
+    sel.addEventListener('change', () => this.onGenre(sel.value));
+  }
+  setGenre(v) { $('#genreSelect').value = v; }
+
+  #distribution() {
+    const host = $('#distList');
+    for (const [id, m] of Object.entries(EMOTIONS)) {
+      host.append(el('li', { class:'dist__row', 'data-id':id },
+        el('span', { text: `${m.emoji} ${m.label.toLowerCase()}` }),
+        el('span', { class:'dist__bar' }, el('i')),
+        el('span', { class:'dist__val', text:'0%' })));
+    }
+  }
+  renderDistribution(scores) {
+    const max = Math.max(...Object.values(scores));
+    for (const row of $('#distList').children) {
+      const v = scores[row.dataset.id] || 0;
+      row.querySelector('i').style.width = `${Math.round(v * 100)}%`;
+      row.querySelector('.dist__val').textContent = `${Math.round(v * 100)}%`;
+      row.classList.toggle('is-top', v === max);
+    }
+  }
+  clearDistribution() {
+    for (const row of $('#distList').children) {
+      row.querySelector('i').style.width = '0%';
+      row.querySelector('.dist__val').textContent = '0%';
+      row.classList.remove('is-top');
+    }
+  }
+
+  setCamState(state, text) {
+    $('#camStatus').dataset.state = state;
+    $('#camStatus').textContent = text;
+    $('#camDot').dataset.state = state === 'live' ? 'live' : state === 'warn' ? 'warn' : state === 'error' ? 'error' : 'idle';
+    $('#scanLine').classList.toggle('is-on', state === 'live' || state === 'scan');
+    $('#stopCam').disabled = state !== 'live' && state !== 'warn';
+    $('#startCam').disabled = state === 'live' || state === 'requesting';
+  }
+  setAnalyze(state, text) { $('#analyzeStatus').dataset.state = state; $('#analyzeStatusText').textContent = text; }
+  setModelState(state, text) { $('#modelState').dataset.state = state; $('#modelStateText').textContent = text; }
+  setFps(n) { $('#fpsReadout').textContent = n ? `${n} fps` : '— fps'; }
+  setPlaceholder(show) { $('#camPlaceholder').hidden = !show; }
+
+  renderEmotion(id, confidence, animate) {
+    const m = EMOTIONS[id] || UNKNOWN;
+    const em = $('#emojiBig');
+    if (animate) { em.classList.remove('pop'); void em.offsetWidth; em.classList.add('pop'); }
+    em.textContent = m.emoji;
+    em.setAttribute('aria-label', m.label);
+    $('#emotionLabel').textContent = m.label;
+    $('#emotionLabel').style.color = m.color;
+    $('#emojiGlow').style.background = m.glow;
+    $('#emotionMessage').textContent = m.message;
+    this.renderConfidence(confidence);
+    $('#categoryChips').replaceChildren(...m.tags.map((tag) =>
+      el('button', { class:'chip chip--tiny', type:'button', text:tag, title:`Filter genre to ${TAG_TO_GENRE[tag] || 'All'}`,
+        onclick: () => { const g = TAG_TO_GENRE[tag]; if (!g) return; this.setGenre(g); this.onGenre(g); } })));
+  }
+  renderConfidence(v) {
+    const pct = Math.round(clamp(v) * 100);
+    $('#confidenceValue').textContent = `${pct}%`;
+    $('#confidenceFill').style.width = `${pct}%`;
+    $('#confidenceFill').style.background = pct >= 60 ? 'linear-gradient(90deg,#34d399,#22d3ee)'
+      : pct >= 35 ? 'linear-gradient(90deg,#fbbf24,#f472b6)' : 'linear-gradient(90deg,#fb7185,#f472b6)';
+  }
+  clearEmotion() {
+    $('#emojiBig').textContent = UNKNOWN.emoji;
+    $('#emotionLabel').textContent = UNKNOWN.label;
+    $('#emotionLabel').style.color = '';
+    $('#emotionMessage').textContent = UNKNOWN.message;
+    $('#confidenceValue').textContent = '—';
+    $('#confidenceFill').style.width = '0%';
+    $('#categoryChips').replaceChildren();
+    $('#dwell').textContent = 'stable';
+    this.clearDistribution();
+  }
+
+  renderRecommendation(pick, query) {
+    if (!pick) {
+      $('#recoTitle').textContent = 'No match for these filters';
+      $('#recoArtist').textContent = 'Try "All" genre or a different language.';
+      $('#recoTags').replaceChildren(); $('#queryText').textContent = '—'; $('#scoringList').replaceChildren();
+      return;
+    }
+    const { track, reasons } = pick;
+    $('#recoTitle').textContent = track.title;
+    $('#recoArtist').textContent = track.artist;
+    $('#recoArt').textContent = EMOTIONS[this.#emotion]?.emoji || '♪';
+    $('#recoTags').replaceChildren(
+      el('span', { class:'chip chip--static', text:track.language }),
+      el('span', { class:'chip chip--static', text:track.genre }),
+      ...track.mood.map((mm) => el('span', { class:'chip chip--static', text:mm })));
+    $('#queryText').textContent = query;
+    $('#scoringList').replaceChildren(...reasons.map((r) => el('li', { text:r })));
+  }
+  setEmotionContext(id) { this.#emotion = id; }
+
+  renderPlayer(track, playback) {
+    $('#playerTitle').textContent = track?.title || 'No track loaded';
+    $('#playerArtist').textContent = track ? track.artist : '—';
+    $('#art').textContent = track ? (EMOTIONS[this.#emotion]?.emoji || '♪') : '♪';
+    $('#playerChips').replaceChildren(...(track ? [
+      el('span', { class:'chip chip--static', text:track.language }),
+      el('span', { class:'chip chip--static', text:track.genre })] : []));
+    $('#playPause').textContent = playback === 'playing' ? '❚❚' : '▶';
+    $('#playPause').setAttribute('aria-label', playback === 'playing' ? 'Pause' : 'Play');
+  }
+  setPlaybackBadge(mode, text) { $('#playbackBadge').dataset.mode = mode; $('#playbackBadge').textContent = text; }
+  setProgress(s) {
+    $('#progressFill').style.width = `${clamp(s / SIM_DURATION) * 100}%`;
+    $('#elapsed').textContent = fmtClock(s);
+    $('#progressBar').setAttribute('aria-valuenow', String(Math.round(s)));
+  }
+  setLiked(on) { $('#likeBtn').textContent = on ? '❤️' : '🤍'; $('#likeBtn').classList.toggle('is-on', on); }
+  setPlayerNote(txt) { $('#playerNote').textContent = txt; }
+  setEmbed(show, query) {
+    const w = $('#embedWrap');
+    if (!show) { w.hidden = true; return; }
+    w.hidden = false;
+    $('#embedFrame').src = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}`;
+  }
+
+  addTimelineEntry(e) {
+    const list = $('#timeline');
+    list.querySelector('.timeline__empty')?.remove();
+    list.prepend(el('li', { class:'timeline__row' },
+      el('time', { text: wallClock(e.at) }),
+      el('span', { class:'tl-emoji', text: `${EMOTIONS[e.emotion]?.emoji || '🫥'} ${e.emotion}` }),
+      el('span', { class:'tl-conf', text: `${Math.round(e.confidence * 100)}%` })));
+    while (list.children.length > 40) list.lastElementChild.remove();
+  }
+  renderStats({ readings, likes, skips, topEmotion }) {
+    $('#stats').replaceChildren(
+      el('div', { class:'stat' }, el('b', { text:String(readings) }), el('span', { text:'readings' })),
+      el('div', { class:'stat' }, el('b', { text:String(likes) }), el('span', { text:'likes' })),
+      el('div', { class:'stat' }, el('b', { text:String(skips) }), el('span', { text:'skips' })));
+    if (topEmotion) $('#dwell').textContent = `mostly ${topEmotion}`;
+  }
+
+  renderForYou(tracks, h) {
+    const list = $('#forYou');
+    list.replaceChildren();
+    if (!tracks.length) {
+      list.append(el('li', { class:'foryou__empty', text:'Recommendations appear once a mood is detected.' }));
+      return;
+    }
+    tracks.forEach((track, i) => list.append(el('li', { class:'foryou__row' },
+      el('span', { class:'foryou__idx', text:String(i + 1).padStart(2, '0') }),
+      el('div', { class:'foryou__info' },
+        el('h4', { text:track.title }), el('p', { text:track.artist }),
+        el('div', { class:'chips chips--tiny' },
+          el('span', { class:'chip chip--static', text:track.language }),
+          el('span', { class:'chip chip--static', text:track.genre }),
+          el('span', { class:'chip chip--static', text:track.mood.join(' / ') }))),
+      el('div', { class:'foryou__btns' },
+        el('button', { type:'button', title:'Play on YouTube', text:'▶', onclick:() => h.onPlay(track) }),
+        el('button', { type:'button', title:'Like', text:'❤', onclick:() => h.onLike(track) }),
+        el('button', { type:'button', title:'Skip', text:'⏭', onclick:() => h.onSkip(track) })))));
+  }
+
+  toggleMesh() {
+    this.#mesh = !this.#mesh;
+    $('#toggleMesh').textContent = `Mesh: ${this.#mesh ? 'on' : 'off'}`;
+    $('#toggleMesh').setAttribute('aria-pressed', String(this.#mesh));
+    return this.#mesh;
+  }
+  setTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    $('#themeToggle').textContent = theme === 'dark' ? '🌙' : '☀️';
+  }
+  startClock() {
+    const t0 = Date.now();
+    setInterval(() => { $('#sessionPill').textContent = fmtClock((Date.now() - t0) / 1000); }, 1000);
+  }
+  async copyQuery(text) {
+    try { await navigator.clipboard.writeText(text); toast('Query copied.', 'ok', 1800); }
+    catch { toast('Clipboard blocked — select the query text manually.', 'warn'); }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   APP STATE + WIRING
+   ═══════════════════════════════════════════════════════════ */
+const state = {
+  emotion: null, confidence: 0, query: '', current: null, playback: 'idle', elapsed: 0,
+  likes: 0, skips: 0, readings: 0, history: [], liked: new Set(), demo: false,
+  embedOn: false, theme: store.get('theme', 'dark'),
+};
+const rec = new RecommendationEngine();
+let timer = 0;
+
+const ui = new UI({
+  onLanguage(id) { rec.setLanguage(id); store.set('lang', id); refresh('language changed'); },
+  onGenre(g) { rec.setGenre(g); store.set('genre', g); refresh('genre changed'); },
+});
+
+const engine = new EmotionEngine({
+  onEmotion(reading, changed) {
+    state.emotion = reading.emotion;
+    state.confidence = reading.confidence;
+    if (changed) {
+      state.readings++;
+      state.history.push({ emotion: reading.emotion, confidence: reading.confidence, at: new Date() });
+      ui.addTimelineEntry(state.history.at(-1));
+      ui.setAnalyze('ok', STATUS.detected);
+      ui.renderEmotion(reading.emotion, reading.confidence, true);
+      ui.setEmotionContext(reading.emotion);
+      refresh('emotion changed');
+    } else {
+      ui.renderConfidence(reading.confidence);
+    }
+    renderStats();
+  },
+  onTrace(scores) { ui.renderDistribution(scores); },
+  onHint(kind) {
+    if (kind === 'low') ui.setAnalyze('warn', STATUS.low);
+    if (kind === 'noface') { ui.setAnalyze('warn', STATUS.noface); ui.setCamState('warn', 'No face in frame'); }
+  },
+});
+
+const camera = new CameraController({
+  video: $('#cam'), canvas: $('#overlay'),
+  onStatus(kind, text) {
+    const map = { idle:'idle', requesting:'requesting', scan:'scan', live:'live', warn:'warn', error:'error' };
+    ui.setCamState(map[kind] || 'idle', text);
+    if (kind === 'scan') ui.setAnalyze('scan', STATUS.scanning);
+    if (kind === 'error') {
+      ui.setAnalyze('error', text);
+      ui.setModelState('error', 'Expression model: unavailable');
+      ui.setPlaceholder(true);
+    }
+    if (kind === 'idle') ui.setAnalyze('idle', STATUS.stopped);
+  },
+  onFps(n) { ui.setFps(n); },
+  onResult(result) {
+    const faces = result?.faceLandmarks || [];
+    if (!faces.length) { engine.pushNoFace(); return; }
+    ui.setCamState('live', faces.length > 1 ? 'Multiple faces — using nearest' : 'Face detected');
+    ui.setAnalyze('scan', faces.length > 1 ? STATUS.multi : STATUS.analysing);
+    const idx = result.faceLandmarks.indexOf(largestFace(faces));
+    const shapes = result.faceBlendshapes?.[idx]?.categories;
+    if (shapes) engine.push(shapes);
+  },
+});
+
+function refresh(reason = 'refresh') {
+  if (!state.emotion) { ui.renderRecommendation(null, ''); return; }
+  const pick = rec.next(state.emotion, state.confidence);
+  if (!pick) { ui.renderRecommendation(null, ''); return; }
+  state.current = pick.track;
+  state.liked.delete(pick.track.id);
+  ui.setLiked(false);
+  state.query = buildQuery({ emotion: state.emotion, language: rec.language, genre: rec.genre, confidence: state.confidence });
+  ui.setEmotionContext(state.emotion);
+  ui.renderRecommendation(pick, state.query);
+  ui.renderPlayer(pick.track, 'idle');
+  ui.setPlaybackBadge('queue', `queued · ${reason}`);
+  ui.setPlayerNote('Queued from the recommendation engine. Nothing is streaming yet — press Play on YouTube.');
+  state.elapsed = 0;
+  ui.setProgress(0);
+  if (state.embedOn) ui.setEmbed(true, state.query);
+  ui.renderForYou(rec.forYou(state.emotion, state.confidence, 4, pick.track.id),
+    { onPlay: playTrack, onLike: likeTrack, onSkip: skipTrack });
+}
+
+function openOnYouTube(track = state.current) {
+  if (!track) { toast('No track selected yet.', 'warn'); return; }
+  const q = state.query || `${track.title} ${track.artist}`;
+  window.open(youtubeUrl(q), '_blank', 'noopener');
+  state.current = track; state.playback = 'playing'; state.elapsed = 0;
+  ui.renderPlayer(track, 'playing');
+  ui.setPlaybackBadge('search', 'opened on YouTube');
+  ui.setPlayerNote('YouTube search opened in a new tab. The progress bar is a simulated timeline, not real stream position.');
+  startTimer();
+}
+function startTimer() {
+  clearInterval(timer);
+  timer = setInterval(() => {
+    if (state.playback !== 'playing') return;
+    state.elapsed = Math.min(state.elapsed + 0.25, SIM_DURATION);
+    ui.setProgress(state.elapsed);
+    if (state.elapsed >= SIM_DURATION) next();
+  }, 250);
+}
+function playTrack(track) {
+  if (!track) return;
+  state.query = buildQuery({ emotion: state.emotion || 'neutral', language: rec.language, genre: rec.genre, confidence: state.confidence });
+  openOnYouTube(track);
+  refresh('track changed');
+}
+function next() {
+  if (!state.emotion) { toast('Detect a mood first.', 'warn'); return; }
+  refresh('next'); openOnYouTube();
+}
+function prev() { state.elapsed = 0; ui.setProgress(0); openOnYouTube(); }
+function likeTrack(track = state.current) {
+  if (!track) return;
+  if (state.liked.has(track.id)) {
+    state.liked.delete(track.id); ui.setLiked(false); toast('Like removed.', 'info', 1600);
+  } else {
+    state.liked.add(track.id); rec.like(track); state.likes++; ui.setLiked(true);
+    toast(`Liked "${track.title}" — similar tracks weighted up.`, 'ok', 2600);
+  }
+  renderStats();
+}
+function skipTrack(track = state.current) {
+  if (!track) return;
+  rec.skip(track); state.skips++;
+  toast(`Skipped "${track.title}" — similar tracks weighted down.`, 'warn', 2400);
+  refresh('skip'); renderStats();
+}
+function renderStats() {
+  const counts = {};
+  for (const h of state.history) counts[h.emotion] = (counts[h.emotion] || 0) + 1;
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  ui.renderStats({ readings: state.readings, likes: state.likes, skips: state.skips,
+    topEmotion: top ? `${EMOTIONS[top[0]]?.emoji || ''} ${top[0]}` : null });
+}
+
+async function startCamera() {
+  if (state.demo) stopDemo();
+  ui.setPlaceholder(false);
+  const ok = await camera.start();
+  if (ok) { ui.setModelState('ok', 'Expression model: running on-device'); engine.reset(); }
+  else ui.setPlaceholder(true);
+}
+function stopCamera() {
+  camera.stop(); engine.reset(); ui.setPlaceholder(true); ui.clearEmotion();
+  ui.setModelState('idle', 'Expression model: idle'); ui.setCamState('idle', STATUS.stopped); ui.setFps(0);
+}
+function startDemo() {
+  if (camera.isLive) stopCamera();
+  state.demo = true;
+  ui.setPlaceholder(false);
+  ui.setCamState('warn', STATUS.demo);
+  ui.setAnalyze('scan', 'Demo readings — no camera');
+  ui.setModelState('idle', 'Expression model: bypassed (demo)');
+  engine.startDemo();
+}
+function stopDemo() { engine.stopDemo(); state.demo = false; }
+
+$('#startCam').addEventListener('click', startCamera);
+$('#stopCam').addEventListener('click', stopCamera);
+$('#demoMode').addEventListener('click', startDemo);
+$('#toggleMesh').addEventListener('click', () => camera.setMesh(ui.toggleMesh()));
+$('#refreshReco').addEventListener('click', () => refresh('manual refresh'));
+$('#refreshForYou').addEventListener('click', () => refresh('list refreshed'));
+$('#playYt').addEventListener('click', () => openOnYouTube());
+$('#playYtm').addEventListener('click', () => {
+  if (!state.query) return;
+  window.open(ytMusicUrl(state.query), '_blank', 'noopener');
+  ui.setPlaybackBadge('search', 'opened on YouTube Music');
+});
+$('#braveBtn').addEventListener('click', () => {
+  const q = state.query || buildQuery({ emotion: state.emotion || 'neutral', language: rec.language, genre: rec.genre });
+  window.open(braveUrl(q), '_blank', 'noopener');
+});
+$('#loadEmbed').addEventListener('click', () => {
+  if (!state.query) { toast('Pick a track first.', 'warn'); return; }
+  state.embedOn = true;
+  ui.setEmbed(true, state.query);
+  ui.setPlaybackBadge('search', 'embedded search');
+  ui.setPlayerNote('In-app player uses the YouTube search embed. If it errors, use Play on YouTube.');
+});
+$('#copyQuery').addEventListener('click', () => ui.copyQuery($('#queryText').textContent));
+$('#playPause').addEventListener('click', () => {
+  if (state.playback === 'playing') {
+    state.playback = 'paused'; ui.renderPlayer(state.current, 'paused');
+    ui.setPlayerNote('Paused the local queue. YouTube playback continues in its own tab.');
+  } else if (state.current) {
+    state.playback = 'playing'; ui.renderPlayer(state.current, 'playing'); startTimer();
+  } else toast('Nothing queued yet.', 'warn');
+});
+$('#nextBtn').addEventListener('click', next);
+$('#prevBtn').addEventListener('click', prev);
+$('#likeBtn').addEventListener('click', () => likeTrack());
+$('#skipBtn').addEventListener('click', () => skipTrack());
+$('#vol').addEventListener('input', (e) => ui.setPlayerNote(`Volume set to ${e.target.value}% — applies to the in-app embed only.`));
+$('#progressBar').addEventListener('click', (e) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  state.elapsed = clamp((e.clientX - r.left) / r.width) * SIM_DURATION;
+  ui.setProgress(state.elapsed);
+});
+$('#themeToggle').addEventListener('click', () => {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  store.set('theme', state.theme); ui.setTheme(state.theme);
+});
+$('#shortcutsBtn').addEventListener('click', () =>
+  toast('C camera · Space play/pause · N next · P prev · L like · S skip · R refresh · T theme · Esc stop', 'info', 7000));
+document.addEventListener('keydown', (e) => {
+  if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === ' ') { e.preventDefault(); $('#playPause').click(); }
+  else if (k === 'n') next();
+  else if (k === 'p') prev();
+  else if (k === 'l') likeTrack();
+  else if (k === 's') skipTrack();
+  else if (k === 'r') refresh('keyboard refresh');
+  else if (k === 't') $('#themeToggle').click();
+  else if (k === 'c') camera.isLive ? stopCamera() : startCamera();
+  else if (k === 'escape') stopCamera();
+});
+
+ui.setTheme(state.theme);
+rec.setLanguage(store.get('lang', 'hindi'));
+rec.setGenre(store.get('genre', 'All'));
+ui.setLanguage(rec.language);
+ui.setGenre(rec.genre);
+ui.clearEmotion();
+ui.startClock();
+ui.renderForYou([], {});
+renderStats();
+setTimeout(() => {
+  ui.hideBoot();
+  toast('Set a language, then start the camera. Detection runs fully on-device.', 'info', 6000);
+}, 1100);
+window.addEventListener('beforeunload', () => camera.dispose());
+</script>
+</body>
+</html>
